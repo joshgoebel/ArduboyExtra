@@ -15,10 +15,12 @@ Arduboy arduboy;
 // create a variable to hold buttons API
 SimpleButtons buttons (arduboy);
 
-// later on in your code
-[snip]
-if (buttons.pressed(LEFT_BUTTON)) {
-    // do cool stuff
+// example of using it in your actual sketch
+void loop()
+{
+    buttons.poll();
+    if (buttons.pressed(LEFT_BUTTON)) {
+        // do cool stuff
+    }
 }
-[snip]
 ```

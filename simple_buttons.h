@@ -9,6 +9,10 @@ class SimpleButtons
 public:
 	SimpleButtons(Arduboy &arduboy);
 
+	/// Poll the hardware buttons and tracks state over time
+	/**
+	This must be called before any of the other button member functions.  It should be called either in your main `loop()` or as part of the frame system (called pre-frame).
+	*/
 	void poll();
 	boolean pressed(uint8_t buttons);
 	boolean notPressed(uint8_t buttons);
