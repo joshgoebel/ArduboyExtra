@@ -5,7 +5,7 @@ ArduboyExtra
 
 ## Usage
 
-```
+```c++
 #include <ArduboyExtra.h>
 // include the extra modules you intent to use
 #include "simple_buttons.h"
