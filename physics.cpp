@@ -14,17 +14,3 @@ bool Physics::collide(Rect rect1, Rect rect2)
             rect2.y                 >=  rect1.y + rect1.height ||
             rect2.y + rect2.height  <=  rect1.y);
 }
-
-// boolean Gamebuino::collidePointRect(int16_t x1, int16_t y1 ,int16_t x2 ,int16_t y2, int16_t w, int16_t h){
-//     if((x1>=x2)&&(x1<x2+w))
-//     if((y1>=y2)&&(y1<y2+h))
-//     return true;
-//     return false;
-// }
-
-// boolean Gamebuino::collideRectRect(int16_t x1, int16_t y1, int16_t w1, int16_t h1 ,int16_t x2 ,int16_t y2, int16_t w2, int16_t h2){
-//   return !( x2     >=  x1+w1  ||
-//             x2+w2  <=  x1     ||
-//             y2     >=  y1+h1  ||
-//             y2+h2  <=  y1     );
-// }
