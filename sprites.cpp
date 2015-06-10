@@ -17,14 +17,17 @@ void Sprites::draw(int16_t x, int16_t y, const uint8_t *bitmap)
 {
   draw(x, y, bitmap, 0, NULL, 0);
 }
+
 void Sprites::draw(int16_t x, int16_t y, const uint8_t *bitmap, const uint8_t *mask)
 {
   draw(x, y, bitmap, 0, mask, 0);
 }
+
 void Sprites::draw(int16_t x, int16_t y, const uint8_t *bitmap, uint8_t frame)
 {
   draw(x, y, bitmap, frame, NULL, 0);
 }
+
 void Sprites::draw(int16_t x, int16_t y, const uint8_t *bitmap, uint8_t frame, const uint8_t *mask, uint8_t sprite_frame)
 {
   uint8_t width = pgm_read_byte(bitmap);
