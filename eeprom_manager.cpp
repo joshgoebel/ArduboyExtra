@@ -1,12 +1,20 @@
 #include "eeprom_manager.h"
 #include "EEPROM.h"
 
+// utility methods
+
+int offsetFromBlock(uint8_t block) {
+    return RESERVED_SIZE + block * BLOCK_SIZE;
+}
+
+
+// SaveData
+
 SaveData::SaveData() : start_offset(0), bytes(0) {}
 
 SaveData::SaveData(int offset, int size) :
     start_offset(offset), bytes(size) {
 }
-
 
 uint8_t SaveData::read(uint8_t address) {
     int abs_address;
@@ -28,16 +36,16 @@ int SaveData::findAddress(int relative_address)
     uint8_t blocks;
     uint8_t next_block;
 
-    if (relative_address < 8) {
-        return start_offset + 8 + relative_address;
+    if (relative_address < HEADER_SIZE) {
+        return start_offset + HEADER_SIZE + relative_address;
     }
-    blocks = (relative_address - 8) / DATA_SIZE;
+    blocks = (relative_address + HEADER_SIZE) / DATA_SIZE;
     for (int i = 0; i <= blocks; i++) {
         next_block = EEPROM.read(offset + 15) & 0b00111111;
-        offset = RESERVED_SIZE + next_block * BLOCK_SIZE;
+        offset = offsetFromBlock(next_block);
     }
     // 0-7, 8-23, 24-39
-    return offset + (relative_address-8) % BLOCK_SIZE;
+    return offset + (relative_address + HEADER_SIZE) % BLOCK_SIZE;
 }
 
 /// read save data into a memory buffer from EEPROM
@@ -84,12 +92,13 @@ boolean cmp(int offset, const char *str) {
 void EepromManager::writeHeader(const char app_id[], int offset, int size) {
     char letter;
     uint8_t blocks, next_block, flag;
+    boolean erase = (app_id[0] == '\0');
 
     // write app id header to first block
     for (int i=0; i < 8; i++) {
         letter = app_id[i];
         if (letter == '\0') break;
-        EEPROM.write(offset+i, app_id[i]);
+        EEPROM.write(offset + i, letter);
     }
     blocks = (size + HEADER_SIZE) / 16;
     for (int i = 0; i <= blocks; i++) {
@@ -99,15 +108,22 @@ void EepromManager::writeHeader(const char app_id[], int offset, int size) {
             next_block = flag = FLAG_LAST_BLOCK;
         // first or middle block
         } else {
+            // write a temp byte so firstFreeBlock() below will no longer
+            // find the current block as empty
+            EEPROM.write(offset + NEXT_BLOCK_PTR, 0x01);
             next_block = firstFreeBlock();
             // set first block flag
             if (i == 0) {
                 flag = FLAG_FIRST_BLOCK;
             }
         }
+        // if erasing, lets mark all the blocks empty
+        if (erase) {
+            flag = FLAG_EMPTY_BLOCK;
+        }
 
         EEPROM.write(offset + NEXT_BLOCK_PTR, next_block | flag);
-        offset = next_block * BLOCK_SIZE + RESERVED_SIZE;
+        offset = offsetFromBlock(next_block);
     }
 
 }
