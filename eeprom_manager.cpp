@@ -36,12 +36,8 @@ int SaveData::findAddress(int relative_address)
     uint8_t blocks;
     uint8_t next_block;
 
-    if (relative_address < HEADER_SIZE) {
-        return start_offset + HEADER_SIZE + relative_address;
-    }
-    blocks = (relative_address + HEADER_SIZE) / DATA_SIZE;
-    for (int i = 0; i <= blocks; i++) {
-        next_block = EEPROM.read(offset + 15) & 0b00111111;
+    for (int i = 0; i < blocks; i++) {
+        next_block = EEPROM.read(offset + NEXT_BLOCK_PTR) & NEXT_BLOCK_MASK;
         offset = offsetFromBlock(next_block);
     }
     // 0-7, 8-23, 24-39
@@ -80,7 +76,7 @@ void SaveData::free() {
 
 /* EEPROM manager */
 
-boolean cmp(int offset, const char *str) {
+boolean compare_app_id(int offset, const char *str) {
     int ret = 0;
     while (!(ret = *(unsigned char *) str - *(unsigned char *) EEPROM.read(offset)) && *str) {
         offset++; str++;
@@ -119,7 +115,7 @@ void EepromManager::writeHeader(const char app_id[], int offset, int size) {
         }
         // if erasing, lets mark all the blocks empty
         if (erase) {
-            flag = FLAG_EMPTY_BLOCK;
+            flag = FLAG_LAST_BLOCK + FLAG_EMPTY_BLOCK;
         }
 
         EEPROM.write(offset + NEXT_BLOCK_PTR, next_block | flag);
@@ -133,11 +129,13 @@ boolean EepromManager::getSaveData(const char app_id[], int size, SaveData *data
     int offset;
     char letter;
     for (int b=0; b < 63; b++) {
-        offset = RESERVED_SIZE + b * BLOCK_SIZE;
-        // 2nd highest bit indicates a start block
+        offset = offsetFromBlock(b);
+        // go thru all 63 blocks (0-62) looking for the first block
         if (!(EEPROM.read(offset + NEXT_BLOCK_PTR) & FLAG_FIRST_BLOCK))
             continue;
-        if (cmp(offset, app_id)) {
+        // when we first a first block, see if it happens to be the correct
+        // first block based on app id
+        if (compare_app_id(offset, app_id)) {
             // TODO: check integrity of existing blocks?
             data = new SaveData(offset,size);
             return true;
@@ -149,7 +147,7 @@ boolean EepromManager::getSaveData(const char app_id[], int size, SaveData *data
         return false;
 
     // allocate new save area
-    offset = firstFreeBlock() * BLOCK_SIZE + RESERVED_SIZE;
+    offset = offsetFromBlock(firstFreeBlock());
     writeHeader(app_id, offset, size);
     data = new SaveData(offset,size);
 
@@ -160,7 +158,7 @@ uint8_t EepromManager::firstFreeBlock() {
     int offset;
     for (int i=0; i < 63; i++) {
         offset = RESERVED_SIZE + i * BLOCK_SIZE;
-        if (EEPROM.read(offset + NEXT_BLOCK_PTR) == FLAG_EMPTY_BLOCK) {
+        if (EEPROM.read(offset + NEXT_BLOCK_PTR) & FLAG_EMPTY_BLOCK) {
             return i;
         }
     }
@@ -173,7 +171,7 @@ uint8_t EepromManager::freeBlocks()
     int offset;
     for (int i=0; i < 63; i++) {
         offset = RESERVED_SIZE + i * BLOCK_SIZE;
-        if (EEPROM.read(offset + NEXT_BLOCK_PTR) == FLAG_EMPTY_BLOCK) {
+        if (EEPROM.read(offset + NEXT_BLOCK_PTR) & FLAG_EMPTY_BLOCK) {
             blocks++;
         }
     }

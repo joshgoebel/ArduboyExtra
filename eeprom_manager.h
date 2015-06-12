@@ -9,9 +9,10 @@
 #define RESERVED_SIZE 16
 #define HEADER_SIZE 8
 
+#define NEXT_BLOCK_MASK 0b00111111
 #define FLAG_FIRST_BLOCK 0x40
-#define FLAG_EMPTY_BLOCK 0xFF
-#define FLAG_LAST_BLOCK (0xFF - 0x80)
+#define FLAG_EMPTY_BLOCK 0x80
+#define FLAG_LAST_BLOCK 0x3F
 #define NO_FREE_BLOCKS 255
 
 class SaveData
