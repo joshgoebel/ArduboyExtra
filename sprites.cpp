@@ -88,7 +88,7 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
     start_h = 0;
   }
 
-  loop_h = h/8 + (yOffset > 0 ? 1 : 0); // divide, then round up
+  loop_h = h/8 + (h%8 > 0 ? 1 : 0); // divide, then round up
 
   // if (sRow + loop_h - 1 > (HEIGHT/8)-1)
   if (sRow + loop_h > (HEIGHT/8)) {
