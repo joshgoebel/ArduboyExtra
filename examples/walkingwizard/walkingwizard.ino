@@ -14,9 +14,7 @@
 
 Arduboy arduboy;
 Sprites sprites (arduboy);
-byte spriteFrame = 0;
-const byte wizard_X = 51;
-const byte wizard_Y = 19;
+Sprite wizard (51, 19, wizard_bitmaps);
 
 void setup() {
   arduboy.start();
@@ -30,9 +28,9 @@ void loop() {
   arduboy.clearDisplay();
   // animate every 180ms or so
   if (arduboy.everyXFrames(11)) {
-    spriteFrame++;
-    if (spriteFrame > 3)
-      spriteFrame = 0;
+    wizard.frame++;
+    if (wizard.frame > 3)
+      wizard.frame = 0;
   }
   drawWizard();
   arduboy.display();
@@ -40,5 +38,5 @@ void loop() {
 
 void drawWizard()
 {
-  sprites.draw(wizard_X, wizard_Y, wizard_bitmaps, spriteFrame);
+  sprites.draw(wizard);
 }

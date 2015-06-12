@@ -6,6 +6,20 @@ Sprites::Sprites(Arduboy &a)
   sBuffer = arduboy->getBuffer();
 }
 
+SimpleSprite::SimpleSprite(int x, int y, const uint8_t *bitmap) :
+x(x), y(y), bitmap(bitmap)
+{
+}
+
+Sprite::Sprite(int x, int y, const uint8_t *bitmap) :
+  SimpleSprite(x,y, bitmap) {
+}
+
+Sprite::Sprite(int x, int y, const uint8_t *bitmap, const uint8_t *mask) :
+  SimpleSprite(x,y, bitmap), mask(mask) {
+}
+
+
 void Sprites::draw(Sprite sprite)
 {
   draw(sprite.x, sprite.y,

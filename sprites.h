@@ -11,14 +11,16 @@
 /// base struct other Sprites inherit from
 struct SimpleSprite
 {
+	SimpleSprite(int x, int y, const uint8_t *bitmap);
 	int x, y;
-	uint8_t w, h;
 	const uint8_t *bitmap;
 	uint8_t frame = 0;
 };
 
 struct Sprite : public SimpleSprite
 {
+	Sprite(int x, int y, const uint8_t *bitmap);
+	Sprite(int x, int y, const uint8_t *bitmap, const uint8_t *mask);
 	const uint8_t *mask;
 	uint8_t maskFrame = 0;
 };
