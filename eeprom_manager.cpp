@@ -7,6 +7,12 @@ int offsetFromBlock(uint8_t block) {
     return RESERVED_SIZE + block * BLOCK_SIZE;
 }
 
+bool blockEmpty(uint8_t block)
+{
+    int offset = offsetFromBlock(block);
+    return EEPROM.read(offset + NEXT_BLOCK_PTR) & FLAG_EMPTY_BLOCK;
+}
+
 
 // SaveData
 
@@ -20,6 +26,9 @@ uint8_t SaveData::read(uint8_t address) {
     int abs_address;
 
     abs_address = findAddress(address);
+    if (abs_address == INVALID_ADDRESS)
+        return 0xFF;
+
     EEPROM.read(abs_address);
 }
 
@@ -27,6 +36,9 @@ void SaveData::write(uint8_t address, uint8_t data) {
     int abs_address;
 
     abs_address = findAddress(address);
+    if (abs_address == INVALID_ADDRESS)
+        return;
+
     EEPROM.write(abs_address, data);
 }
 
@@ -39,6 +51,11 @@ int SaveData::findAddress(int relative_address)
     blocks = (relative_address + HEADER_SIZE) / DATA_SIZE;
     for (uint8_t i = 0; i < blocks; i++) {
         next_block = EEPROM.read(offset + NEXT_BLOCK_PTR) & NEXT_BLOCK_MASK;
+        // if we're trying to read an address that would be past the end
+        // of the block size then return an invalid address
+        if (next_block == FLAG_LAST_BLOCK) {
+            return INVALID_ADDRESS;
+        }
         offset = offsetFromBlock(next_block);
     }
     // 0-7, 8-23, 24-39
@@ -87,21 +104,25 @@ boolean compare_app_id(int offset, const char *str) {
 
 // writes the app id into the header and reserves the space
 void EepromManager::writeHeader(const char app_id[], int offset, int size) {
-    char letter;
+    char letter = ' ';
     uint8_t blocks, next_block, flag;
-    boolean erase = (app_id[0] == '\0');
+    boolean erase_mode = (app_id[0] == '\0');
 
     // write app id header to first block
     for (uint8_t i=0; i < 8; i++) {
-        letter = app_id[i];
-        if (letter == '\0') break;
+        if (letter != '\0')
+            letter = app_id[i];
         EEPROM.write(offset + i, letter);
     }
-    blocks = (size + HEADER_SIZE) / 16;
+    blocks = (size + HEADER_SIZE) / BLOCK_SIZE;
     for (uint8_t i = 0; i <= blocks; i++) {
         flag = 0;
+        // if erasing, lets mark all the blocks empty
+        if (erase_mode) {
+            next_block = EEPROM.read(offset + NEXT_BLOCK_PTR) & NEXT_BLOCK_MASK;
+            flag = FLAG_LAST_BLOCK + FLAG_EMPTY_BLOCK;
         // last block of chain
-        if ( i == blocks) {
+        } else if ( i == blocks) {
             next_block = flag = FLAG_LAST_BLOCK;
         // first or middle block
         } else {
@@ -113,10 +134,6 @@ void EepromManager::writeHeader(const char app_id[], int offset, int size) {
             if (i == 0) {
                 flag = FLAG_FIRST_BLOCK;
             }
-        }
-        // if erasing, lets mark all the blocks empty
-        if (erase) {
-            flag = FLAG_LAST_BLOCK + FLAG_EMPTY_BLOCK;
         }
 
         EEPROM.write(offset + NEXT_BLOCK_PTR, next_block | flag);
@@ -158,8 +175,7 @@ boolean EepromManager::getSaveData(const char app_id[], int size, SaveData *data
 uint8_t EepromManager::firstFreeBlock() {
     int offset;
     for (uint8_t i=0; i < 63; i++) {
-        offset = RESERVED_SIZE + i * BLOCK_SIZE;
-        if (EEPROM.read(offset + NEXT_BLOCK_PTR) & FLAG_EMPTY_BLOCK) {
+        if (blockEmpty(i)) {
             return i;
         }
     }
@@ -171,8 +187,7 @@ uint8_t EepromManager::freeBlocks()
     int blocks = 0;
     int offset;
     for (uint8_t i=0; i < 63; i++) {
-        offset = offsetFromBlock(i);
-        if (EEPROM.read(offset + NEXT_BLOCK_PTR) & FLAG_EMPTY_BLOCK) {
+        if (blockEmpty(i)) {
             blocks++;
         }
     }
@@ -181,5 +196,5 @@ uint8_t EepromManager::freeBlocks()
 
 int EepromManager::freeBytes()
 {
-    return freeBlocks() * BLOCK_SIZE;
+    return freeBlocks() * DATA_SIZE - HEADER_SIZE;
 }
