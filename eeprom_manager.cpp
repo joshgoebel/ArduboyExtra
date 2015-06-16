@@ -36,7 +36,8 @@ int SaveData::findAddress(int relative_address)
     uint8_t blocks;
     uint8_t next_block;
 
-    for (int i = 0; i < blocks; i++) {
+    blocks = (relative_address + HEADER_SIZE) / DATA_SIZE;
+    for (uint8_t i = 0; i < blocks; i++) {
         next_block = EEPROM.read(offset + NEXT_BLOCK_PTR) & NEXT_BLOCK_MASK;
         offset = offsetFromBlock(next_block);
     }
@@ -77,7 +78,7 @@ void SaveData::free() {
 /* EEPROM manager */
 
 boolean compare_app_id(int offset, const char *str) {
-    int ret = 0;
+    uint8_t ret = 0;
     while (!(ret = *(unsigned char *) str - *(unsigned char *) EEPROM.read(offset)) && *str) {
         offset++; str++;
     }
@@ -91,13 +92,13 @@ void EepromManager::writeHeader(const char app_id[], int offset, int size) {
     boolean erase = (app_id[0] == '\0');
 
     // write app id header to first block
-    for (int i=0; i < 8; i++) {
+    for (uint8_t i=0; i < 8; i++) {
         letter = app_id[i];
         if (letter == '\0') break;
         EEPROM.write(offset + i, letter);
     }
     blocks = (size + HEADER_SIZE) / 16;
-    for (int i = 0; i <= blocks; i++) {
+    for (uint8_t i = 0; i <= blocks; i++) {
         flag = 0;
         // last block of chain
         if ( i == blocks) {
@@ -128,7 +129,7 @@ boolean EepromManager::getSaveData(const char app_id[], int size, SaveData *data
 {
     int offset;
     char letter;
-    for (int b=0; b < 63; b++) {
+    for (uint8_t b=0; b < 63; b++) {
         offset = offsetFromBlock(b);
         // go thru all 63 blocks (0-62) looking for the first block
         if (!(EEPROM.read(offset + NEXT_BLOCK_PTR) & FLAG_FIRST_BLOCK))
@@ -156,7 +157,7 @@ boolean EepromManager::getSaveData(const char app_id[], int size, SaveData *data
 
 uint8_t EepromManager::firstFreeBlock() {
     int offset;
-    for (int i=0; i < 63; i++) {
+    for (uint8_t i=0; i < 63; i++) {
         offset = RESERVED_SIZE + i * BLOCK_SIZE;
         if (EEPROM.read(offset + NEXT_BLOCK_PTR) & FLAG_EMPTY_BLOCK) {
             return i;
@@ -169,8 +170,8 @@ uint8_t EepromManager::freeBlocks()
 {
     int blocks = 0;
     int offset;
-    for (int i=0; i < 63; i++) {
-        offset = RESERVED_SIZE + i * BLOCK_SIZE;
+    for (uint8_t i=0; i < 63; i++) {
+        offset = offsetFromBlock(i);
         if (EEPROM.read(offset + NEXT_BLOCK_PTR) & FLAG_EMPTY_BLOCK) {
             blocks++;
         }
