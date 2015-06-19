@@ -20,7 +20,6 @@ class SaveData
 {
 public:
   SaveData();
-  SaveData(int offset, int size);
   uint8_t read(uint8_t address); //< read a single byte
   void write(uint8_t address, uint8_t data); //< write a single byte
 
@@ -33,20 +32,27 @@ public:
   int maxSize(); //< return the size of this save data area
   void free(); //< release the save data allocation back to the system
 
+  void init(int offset, int size);
 private:
+  SaveData(int offset, int size);
   int findAddress(int relative_address);
-  const int start_offset; //< offset into EEPROM of first block
-  const int bytes;  //< alloted data storage size (not counting header)
+  int start_offset; //< offset into EEPROM of first block
+  int bytes;  //< alloted data storage size (not counting header)
+
+  friend class EepromManager;
 };
 
 class EepromManager
 {
 public:
   static boolean getSaveData(const char app_id[], int size, SaveData *data);
-  static void writeHeader(const char app_id[], int offset, int size);
   static uint8_t freeBlocks();
-  static uint8_t firstFreeBlock();
   static int freeBytes();
+  static void releaseSaveData(SaveData *data) __attribute__((always_inline));
+
+private:
+  static void writeHeader(const char app_id[], int offset, int size);
+  static uint8_t firstFreeBlock();
 };
 
 

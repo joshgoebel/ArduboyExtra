@@ -22,6 +22,12 @@ SaveData::SaveData(int offset, int size) :
     start_offset(offset), bytes(size) {
 }
 
+void SaveData::init(int offset, int size)
+{
+    this->start_offset = offset;
+    this->bytes = size;
+}
+
 uint8_t SaveData::read(uint8_t address) {
     int abs_address;
 
@@ -88,7 +94,7 @@ int SaveData::maxSize() {
 }
 
 void SaveData::free() {
-    EepromManager::writeHeader('\0',start_offset, bytes);
+    EepromManager::releaseSaveData(this);
 }
 
 
@@ -155,7 +161,7 @@ boolean EepromManager::getSaveData(const char app_id[], int size, SaveData *data
         // first block based on app id
         if (compare_app_id(offset, app_id)) {
             // TODO: check integrity of existing blocks?
-            data = new SaveData(offset,size);
+            data->init(offset,size);
             return true;
         }
     }
@@ -167,13 +173,12 @@ boolean EepromManager::getSaveData(const char app_id[], int size, SaveData *data
     // allocate new save area
     offset = offsetFromBlock(firstFreeBlock());
     writeHeader(app_id, offset, size);
-    data = new SaveData(offset,size);
+    data->init(offset,size);
 
     return true;
 }
 
 uint8_t EepromManager::firstFreeBlock() {
-    int offset;
     for (uint8_t i=0; i < 63; i++) {
         if (blockEmpty(i)) {
             return i;
@@ -184,8 +189,7 @@ uint8_t EepromManager::firstFreeBlock() {
 
 uint8_t EepromManager::freeBlocks()
 {
-    int blocks = 0;
-    int offset;
+    uint8_t blocks = 0;
     for (uint8_t i=0; i < 63; i++) {
         if (blockEmpty(i)) {
             blocks++;
@@ -197,4 +201,8 @@ uint8_t EepromManager::freeBlocks()
 int EepromManager::freeBytes()
 {
     return freeBlocks() * DATA_SIZE - HEADER_SIZE;
+}
+
+void EepromManager::releaseSaveData(SaveData *data) {
+    writeHeader('\0', data->start_offset, data->bytes);
 }
