@@ -134,7 +134,7 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
                 data |= pgm_read_byte(bofs) << yOffset;
                 sBuffer[ofs] = data;
             }
-            if (yOffset > 0) {
+            if (yOffset > 0 && sRow<7) {
                 data = sBuffer[ofs+WIDTH];
                 data &= bottom_mask;
                 data |= pgm_read_byte(bofs) >> (8-yOffset);
@@ -154,7 +154,7 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
             if (sRow >= 0) {
                 sBuffer[ofs] |= pgm_read_byte(bofs) << yOffset;
             }
-            if (yOffset > 0) {
+            if (yOffset > 0 && sRow<7) {
                 sBuffer[ofs+WIDTH] |= pgm_read_byte(bofs) >> (8-yOffset);
             }
           ofs++;
@@ -171,7 +171,7 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
             if (sRow >= 0) {
               sBuffer[ofs]  &= ~(pgm_read_byte(bofs) << yOffset);
             }
-            if (yOffset > 0) {
+            if (yOffset > 0 && sRow<7) {
               sBuffer[ofs+WIDTH] &= ~(pgm_read_byte(bofs) >> (8-yOffset));
             }
           ofs++;
@@ -191,7 +191,7 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
             data |= (pgm_read_byte(bofs) << yOffset);
             sBuffer[ofs] = data;
           }
-          if (yOffset > 0) {
+          if (yOffset > 0 && sRow<7) {
             data = sBuffer[ofs+WIDTH];
             data &= (pgm_read_byte(mask_ofs) >> (8-yOffset));
             data |= (pgm_read_byte(bofs) >> (8-yOffset));
