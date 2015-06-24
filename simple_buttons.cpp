@@ -1,4 +1,5 @@
 #include "simple_buttons.h"
+#include <avr/wdt.h>
 
 // store current and previous buttons state for frame based button events
 // you should be using nextFrame() in almost all cases, not calling this
@@ -12,6 +13,13 @@ void SimpleButtons::poll()
 {
   previousButtonState = currentButtonState;
   currentButtonState = arduboy->getInput();
+  #ifdef SOFT_RESET
+  if (currentButtonState==(LEFT_BUTTON|RIGHT_BUTTON|UP_BUTTON|DOWN_BUTTON)) {
+    *(uint16_t *)0x0800 = 0x7777;
+    wdt_enable(WDTO_15MS);
+    while(true) {}
+  }
+  #endif
 }
 
 // returns true if the button mask passed in is pressed
