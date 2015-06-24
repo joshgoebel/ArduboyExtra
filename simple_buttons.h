@@ -19,6 +19,13 @@ public:
 	boolean justReleased(uint8_t button);
 	boolean justPressed(uint8_t button);
 
+	boolean up();
+	boolean down();
+	boolean right();
+	boolean left();
+	boolean a();
+	boolean b();
+
 
 private:
 	uint8_t currentButtonState = 0;
