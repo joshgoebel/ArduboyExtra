@@ -65,14 +65,14 @@ void Sprites::draw(int16_t x, int16_t y, const uint8_t *bitmap, uint8_t frame, c
 
 void Sprites::drawBitmap(int16_t x, int16_t y,
   const uint8_t *bitmap, const uint8_t *mask,
-  int16_t w, int16_t h, uint8_t draw_mode) {
+  int8_t w, int8_t h, uint8_t draw_mode) {
   // no need to draw at all of we're offscreen
   if (x+w < 0 || x > WIDTH-1 || y+h < 0 || y > HEIGHT-1)
     return;
 
   // xOffset technically doesn't need to be 16 bit but the math operations
   // are measurably faster if it is
-  int xOffset, ofs, ofs2;
+  int xOffset, ofs;
   int8_t yOffset = abs(y) % 8;
   int8_t sRow = y / 8;
   uint8_t loop_w, loop_h, start_h;
@@ -183,20 +183,35 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
       }
     break;
     case SPRITE_MASKED:
+    uint8_t mul_amt = 1 << yOffset;
+    uint16_t mask_data;
+    uint16_t bitmap_data;
+
     for (uint8_t a = start_h; a < loop_h; a++) {
       for (uint8_t iCol = xOffset; iCol < loop_w; iCol++) {
-          if (sRow >= 0) {
-            data = sBuffer[ofs];
-            data &= (pgm_read_byte(mask_ofs) << yOffset);
-            data |= (pgm_read_byte(bofs) << yOffset);
-            sBuffer[ofs] = data;
-          }
-          if (yOffset > 0 && sRow<7) {
-            data = sBuffer[ofs+WIDTH];
-            data &= (pgm_read_byte(mask_ofs) >> (8-yOffset));
-            data |= (pgm_read_byte(bofs) >> (8-yOffset));
-            sBuffer[ofs+WIDTH] = data;
-          }
+        // NOTE: you might think in the yOffset==0 case that this result
+        // in more effort, but in all my testing the compiler was forcing
+        // 16-bit math to happen here anyways, so this isn't actually
+        // compiling to more code than it otherwise would. If the offset
+        // is 0 the high part of the word will just never be used.
+
+        // load data and bit shift
+        // mask needs to be bit flipped
+        mask_data = ~(pgm_read_byte(mask_ofs) * mul_amt);
+        bitmap_data = pgm_read_byte(bofs) * mul_amt;
+
+        if (sRow >= 0) {
+          data = sBuffer[ofs];
+          data &= (uint8_t)(mask_data);
+          data |= (uint8_t)(bitmap_data);
+          sBuffer[ofs] = data;
+        }
+        if (yOffset != 0 && sRow < 7) {
+          data = sBuffer[ofs+WIDTH];
+          data &= (*((unsigned char *) (&mask_data) + 1));
+          data |= (*((unsigned char *) (&bitmap_data) + 1));
+          sBuffer[ofs+WIDTH] = data;
+        }
         ofs++;
         mask_ofs++;
         bofs++;
