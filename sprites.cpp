@@ -75,7 +75,7 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
   int xOffset, ofs;
   int8_t yOffset = abs(y) % 8;
   int8_t sRow = y / 8;
-  uint8_t loop_w, loop_h, start_h;
+  uint8_t loop_h, start_h, rendered_width;
 
   if (y < 0 && yOffset > 0) {
     sRow--;
@@ -84,10 +84,11 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
 
   // if the right side of the render is offscreen skip those loops
   if (x+w > WIDTH-1) {
-    loop_w = WIDTH-x;
+    rendered_width = ((WIDTH-x) - xOffset);
   } else {
-    loop_w = w;
+    rendered_width = (w - xOffset);
   }
+
   // if the left side of the render is offscreen skip those loops
   if (x<0) {
     xOffset = abs(x);
@@ -109,86 +110,217 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
     loop_h = (HEIGHT/8) - sRow;
   }
 
+  // prepare variables for loops later so we can compare with 0
+  // instead of comparing two variables
+  loop_h -= start_h;
+
   sRow += start_h;
   ofs = (sRow*WIDTH) + x + xOffset;
-  uint8_t rendered_width = (loop_w - xOffset);
   uint8_t *bofs = (uint8_t *)bitmap+(start_h*w) + xOffset;
   uint8_t *mask_ofs;
   if (mask!=0)
     mask_ofs = (uint8_t *)mask+(start_h*w) + xOffset;
   uint8_t data;
 
-  uint8_t top_mask;
-  uint8_t bottom_mask;
+  uint8_t mul_amt = 1 << yOffset;
+  uint16_t mask_data;
+  uint16_t bitmap_data;
+
   switch (draw_mode) {
     case SPRITE_UNMASKED:
-    top_mask = ((1<<yOffset)-1);
-    bottom_mask= ~(0xFF >> (8-yOffset));
+    // we only want to mask the 8 bits of our own sprite, so we can
+    // calculate the mask before the start of the loop
+    mask_data = ~(0xFF * mul_amt);
     // really if yOffset = 0 you have a faster case here that could be
     // optimized
-      for (uint8_t a = start_h; a < loop_h; a++) {
-        for (uint8_t iCol = xOffset; iCol < loop_w; iCol++) {
-            if (sRow >= 0) {
-                data = sBuffer[ofs];
-                data &= top_mask;
-                data |= pgm_read_byte(bofs) << yOffset;
-                sBuffer[ofs] = data;
-            }
-            if (yOffset > 0 && sRow<7) {
-                data = sBuffer[ofs+WIDTH];
-                data &= bottom_mask;
-                data |= pgm_read_byte(bofs) >> (8-yOffset);
-                sBuffer[ofs+WIDTH] = data;
-            }
-          ofs++;
-          bofs++;
-        }
-        sRow++;
-        bofs += w - rendered_width;
-        ofs += WIDTH - rendered_width;
-      }
-    break;
-    case SPRITE_IS_MASK:
-      for (uint8_t a = start_h; a < loop_h; a++) {
-        for (uint8_t iCol = xOffset; iCol < loop_w; iCol++) {
-            if (sRow >= 0) {
-                sBuffer[ofs] |= pgm_read_byte(bofs) << yOffset;
-            }
-            if (yOffset > 0 && sRow<7) {
-                sBuffer[ofs+WIDTH] |= pgm_read_byte(bofs) >> (8-yOffset);
-            }
-          ofs++;
-          bofs++;
-        }
-        sRow++;
-        bofs += w - rendered_width;
-        ofs += WIDTH - rendered_width;
-      }
-    break;
-    case SPRITE_IS_MASK_ERASE:
-      for (uint8_t a = start_h; a < loop_h; a++) {
-        for (uint8_t iCol = xOffset; iCol < loop_w; iCol++) {
-            if (sRow >= 0) {
-              sBuffer[ofs]  &= ~(pgm_read_byte(bofs) << yOffset);
-            }
-            if (yOffset > 0 && sRow<7) {
-              sBuffer[ofs+WIDTH] &= ~(pgm_read_byte(bofs) >> (8-yOffset));
-            }
-          ofs++;
-          bofs++;
-        }
-        sRow++;
-        bofs += w - rendered_width;
-        ofs += WIDTH - rendered_width;
-      }
-    break;
-    case SPRITE_MASKED:
-    uint8_t mul_amt = 1 << yOffset;
-    uint16_t mask_data;
-    uint16_t bitmap_data;
+      for (uint8_t a = 0; a < loop_h; a++) {
+        for (uint8_t iCol = 0; iCol < rendered_width; iCol++) {
+          bitmap_data = pgm_read_byte(bofs) * mul_amt;
 
-    for (uint8_t a = start_h; a < loop_h; a++) {
-      for (uint8_t iCol = xOffset; iCol < loop_w; iCol++) {
+          if (sRow >= 0) {
+            data = sBuffer[ofs];
+            data &= (uint8_t)(mask_data);
+            data |= (uint8_t)(bitmap_data);
+            sBuffer[ofs] = data;
+          }
+          if (yOffset != 0 && sRow < 7) {
+            data = sBuffer[ofs+WIDTH];
+            data &= (*((unsigned char *) (&mask_data) + 1));
+            data |= (*((unsigned char *) (&bitmap_data) + 1));
+            sBuffer[ofs+WIDTH] = data;
+          }
+          ofs++;
+          bofs++;
+        }
+        sRow++;
+        bofs += w - rendered_width;
+        ofs += WIDTH - rendered_width;
+      }
+    break;
+
+    case SPRITE_IS_MASK:
+      for (uint8_t a = 0; a < loop_h; a++) {
+        for (uint8_t iCol = 0; iCol < rendered_width; iCol++) {
+          bitmap_data = pgm_read_byte(bofs) * mul_amt;
+            if (sRow >= 0) {
+                sBuffer[ofs] |= (uint8_t)(bitmap_data);
+            }
+            if (yOffset != 0 && sRow<7) {
+                sBuffer[ofs+WIDTH] |= (*((unsigned char *) (&bitmap_data) + 1));
+            }
+          ofs++;
+          bofs++;
+        }
+        sRow++;
+        bofs += w - rendered_width;
+        ofs += WIDTH - rendered_width;
+      }
+    break;
+
+    case SPRITE_IS_MASK_ERASE:
+      for (uint8_t a = 0; a < loop_h; a++) {
+        for (uint8_t iCol = 0; iCol < rendered_width; iCol++) {
+          bitmap_data = pgm_read_byte(bofs) * mul_amt;
+            if (sRow >= 0) {
+              sBuffer[ofs]  &= ~(uint8_t)(bitmap_data);
+            }
+            if (yOffset != 0 && sRow<7) {
+              sBuffer[ofs+WIDTH] &= ~(*((unsigned char *) (&bitmap_data) + 1));
+            }
+          ofs++;
+          bofs++;
+        }
+        sRow++;
+        bofs += w - rendered_width;
+        ofs += WIDTH - rendered_width;
+      }
+    break;
+
+    case SPRITE_MASKED:
+    // asm volatile("nop\n":: "y" (sBuffer) :);
+    uint8_t xi = loop_h; // used for x loop below
+    uint8_t yi = rendered_width; // used for x loop below
+    asm volatile(
+      "push r28\n" // save Y
+      "push r29\n"
+      "mov r28, %A[buffer_page2_ofs]\n" // Y = buffer page 2 offset
+      "mov r29, %B[buffer_page2_ofs]\n"
+      "loop_y:\n"
+
+      "loop_x:\n"
+        // load bitmap and mask data
+        "lpm %A[bitmap_data], Z+\n"
+
+        // self mask for now
+        // "lpm %A[mask_data], Z+\n"
+        "mov %A[mask_data], %A[bitmap_data]\n"
+
+        // shift mask and buffer data
+        "tst %[yOffset]\n"
+        "breq skip_shifting\n"
+          "mul %A[bitmap_data], %[mul_amt]\n"
+          "mov %A[bitmap_data], r0\n"
+          "mov %B[bitmap_data], r1\n"
+          "mul %A[mask_data], %[mul_amt]\n"
+          "mov %A[mask_data], r0\n"
+          "mov %B[mask_data], r1\n"
+          "clr __zero_reg__\n"
+          "com %B[mask_data]\n" // invert high byte of mask
+        "skip_shifting:\n"
+          "com %A[mask_data]\n"
+
+
+        // FIRST PAGE
+        // if sRow >= 0
+        "tst %[sRow]\n"
+        "brmi end_first_page\n"
+          // then
+          "ld %[data], %a[buffer_ofs]\n"
+          "and %[data], %A[mask_data]\n"
+          "or %[data], %A[bitmap_data]\n"
+          // update buffer, increment
+          "st %a[buffer_ofs], %[data]\n"
+
+        // increment X counter
+        "end_first_page:\n"
+          "adiw r26, 1\n"
+
+        // SECOND PAGE
+        // if yOffset != 0 && sRow < 7
+        "tst %[yOffset]\n"
+        "breq end_second_page\n"
+        "cpi %[sRow], 7\n"
+        "brge end_second_page\n"
+        // then
+          "ld %[data], Y\n"
+          "and %[data], %B[mask_data]\n"
+          "or %[data], %B[bitmap_data]\n"
+          // update buffer, increment
+          "st Y, %[data]\n"
+
+        // increment Y counter
+        "end_second_page:\n"
+          "adiw r28, 1\n"
+
+        // "x_loop_next:\n"
+        "dec %[xi]\n"
+        "breq next_loop_y\n"
+        "rjmp loop_x\n"
+
+      // increment y
+      "next_loop_y:\n"
+      "dec %[yi]\n"
+      "breq finished\n"
+      "mov %[xi], %[x_count]\n" // reset x counter
+      // sRow++;
+      "inc %[sRow]\n"
+      // sprite_ofs += w - rendered_width;
+      "add %A[sprite_ofs], %[w]\n"
+      "adc %B[sprite_ofs], __zero_reg__\n"
+      "sub %A[sprite_ofs], %[y_count]\n"
+      "sbc %B[sprite_ofs], __zero_reg__\n"
+      // buffer_ofs += WIDTH - rendered_width;
+      "ldi r16, %[width]\n"
+      "add %A[buffer_ofs], r16\n"
+      "adc %B[buffer_ofs], __zero_reg__\n"
+      "sub %A[buffer_ofs], %[y_count]\n"
+      "sbc %B[buffer_ofs], __zero_reg__\n"
+      // buffer_ofs_page_2 += WIDTH - rendered_width;
+      "add r28, r16\n"
+      "adc r29, __zero_reg__\n"
+      "sub r28, %[y_count]\n"
+      "sbc r29, __zero_reg__\n"
+
+
+      "rjmp loop_y\n"
+      "finished:\n"
+      // put the Y register back in place
+      "pop r29\n"
+      "pop r28\n"
+      "clr __zero_reg__\n" // just in case
+      :
+      : [data] "r" (data),
+        [xi] "r" (xi),
+        [yi] "r" (yi),
+        [x_count] "r" (loop_h),
+        [y_count] "r" (rendered_width),
+        [mask_data] "r" (mask_data),
+        [bitmap_data] "r" (bitmap_data),
+        [sprite_ofs] "z" (bofs),
+        [buffer_ofs] "x" (sBuffer+ofs),
+        [buffer_page2_ofs] "r" (sBuffer+ofs+WIDTH), // Y pointer
+        [yOffset] "r" (yOffset),
+        [mul_amt] "r" (mul_amt),
+        [sRow] "a" (sRow), // CPI requires an upper register
+        [w] "r" (w),
+        [width] "M" (WIDTH)
+
+      : "r16"
+    );
+    return;
+
+    for (uint8_t a = 0; a < loop_h; a++) {
+      for (uint8_t iCol = 0; iCol < rendered_width; iCol++) {
         // NOTE: you might think in the yOffset==0 case that this result
         // in more effort, but in all my testing the compiler was forcing
         // 16-bit math to happen here anyways, so this isn't actually
@@ -222,6 +354,7 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
       ofs += WIDTH - rendered_width;
     }
     break;
+
 
   }
 }
