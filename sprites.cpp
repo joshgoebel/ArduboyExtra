@@ -246,11 +246,26 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
           "mov %B[bitmap_data], r1\n"
           "mul %A[mask_data], %[mul_amt]\n"
           "mov %A[mask_data], r0\n"
-          "mov %B[mask_data], r1\n"
-          "clr __zero_reg__\n"
-          "com %B[mask_data]\n" // invert high byte of mask
+          // "mov %B[mask_data], r1\n"
+
+
+          // SECOND PAGE
+          // if yOffset != 0 && sRow < 7
+          "cpi %[sRow], 7\n"
+          "brge end_second_page\n"
+          // then
+            "ld %[data], Y\n"
+            // "com %B[mask_data]\n" // invert high byte of mask
+            "com r1\n"
+            "and %[data], r1\n" // %B[mask_data]
+            "or %[data], %B[bitmap_data]\n"
+            // update buffer, increment
+            "st Y+, %[data]\n"
+
+        "end_second_page:\n"
+
         "skip_shifting:\n"
-          "com %A[mask_data]\n"
+
 
 
         // FIRST PAGE
@@ -259,6 +274,7 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
         "brmi end_first_page\n"
           // then
           "ld %[data], %a[buffer_ofs]\n"
+          "com %A[mask_data]\n"
           "and %[data], %A[mask_data]\n"
           "or %[data], %A[bitmap_data]\n"
           // update buffer, increment
@@ -268,22 +284,6 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
         "end_first_page:\n"
           "adiw r26, 1\n"
 
-        // SECOND PAGE
-        // if yOffset != 0 && sRow < 7
-        "tst %[yOffset]\n"
-        "breq end_second_page\n"
-        "cpi %[sRow], 7\n"
-        "brge end_second_page\n"
-        // then
-          "ld %[data], Y\n"
-          "and %[data], %B[mask_data]\n"
-          "or %[data], %B[bitmap_data]\n"
-          // update buffer, increment
-          "st Y, %[data]\n"
-
-        // increment Y counter
-        "end_second_page:\n"
-          "adiw r28, 1\n"
 
         // "x_loop_next:\n"
         "dec %[xi]\n"
@@ -297,22 +297,18 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
       "mov %[xi], %[x_count]\n" // reset x counter
       // sRow++;
       "inc %[sRow]\n"
+      "clr __zero_reg__\n"
       // sprite_ofs += w - rendered_width;
       "add %A[sprite_ofs], %[w]\n"
       "adc %B[sprite_ofs], __zero_reg__\n"
       "sub %A[sprite_ofs], %[x_count]\n"
       "sbc %B[sprite_ofs], __zero_reg__\n"
       // buffer_ofs += WIDTH - rendered_width;
-      "ldi r16, %[width]\n"
-      "add %A[buffer_ofs], r16\n"
+      "add %A[buffer_ofs], %A[buffer_ofs_jump]\n"
       "adc %B[buffer_ofs], __zero_reg__\n"
-      "sub %A[buffer_ofs], %[x_count]\n"
-      "sbc %B[buffer_ofs], __zero_reg__\n"
       // buffer_ofs_page_2 += WIDTH - rendered_width;
-      "add r28, r16\n"
+      "add r28, %A[buffer_ofs_jump]\n"
       "adc r29, __zero_reg__\n"
-      "sub r28, %[x_count]\n"
-      "sbc r29, __zero_reg__\n"
 
 
       "rjmp loop_y\n"
@@ -333,10 +329,10 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
         [sprite_ofs] "z" (bofs),
         [buffer_ofs] "x" (sBuffer+ofs),
         [buffer_page2_ofs] "r" (sBuffer+ofs+WIDTH), // Y pointer
+        [buffer_ofs_jump] "r" (WIDTH-rendered_width),
         [yOffset] "r" (yOffset),
         [mul_amt] "r" (mul_amt),
-        [w] "r" (w),
-        [width] "M" (WIDTH)
+        [w] "r" (w)
 
       : "r16"
     );
