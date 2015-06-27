@@ -67,12 +67,12 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
   const uint8_t *bitmap, const uint8_t *mask,
   int8_t w, int8_t h, uint8_t draw_mode) {
   // no need to draw at all of we're offscreen
-  if (x+w < 0 || x > WIDTH-1 || y+h < 0 || y > HEIGHT-1)
+  if (x+w <= 0 || x > WIDTH-1 || y+h <= 0 || y > HEIGHT-1)
     return;
 
   // xOffset technically doesn't need to be 16 bit but the math operations
   // are measurably faster if it is
-  int xOffset, ofs;
+  uint16_t xOffset, ofs;
   int8_t yOffset = abs(y) % 8;
   int8_t sRow = y / 8;
   uint8_t loop_h, start_h, rendered_width;
@@ -82,18 +82,18 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
     yOffset = 8 - yOffset;
   }
 
-  // if the right side of the render is offscreen skip those loops
-  if (x+w > WIDTH-1) {
-    rendered_width = ((WIDTH-x) - xOffset);
-  } else {
-    rendered_width = (w - xOffset);
-  }
-
   // if the left side of the render is offscreen skip those loops
   if (x<0) {
     xOffset = abs(x);
   } else {
     xOffset = 0;
+  }
+
+  // if the right side of the render is offscreen skip those loops
+  if (x+w > WIDTH-1) {
+    rendered_width = ((WIDTH-x) - xOffset);
+  } else {
+    rendered_width = (w - xOffset);
   }
 
   // if the top side of the render is offscreen skip those loops
@@ -197,16 +197,39 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
     break;
 
     case SPRITE_MASKED:
-    // asm volatile("nop\n":: "y" (sBuffer) :);
-    uint8_t xi = loop_h; // used for x loop below
-    uint8_t yi = rendered_width; // used for x loop below
+    uint8_t xi = rendered_width; // used for x loop below
+    uint8_t yi = loop_h; // used for y loop below
+
+    // arduboy->setCursor(0,32);
+    // arduboy->print("xi: ");
+    // arduboy->print(xi);
+    // arduboy->print("   yi: ");
+    // arduboy->print(yi);
+    // arduboy->println("  ");
+    // arduboy->print("x: ");
+    // arduboy->print(x);
+    // arduboy->print("   y: ");
+    // arduboy->print(y);
+    // arduboy->println("  ");
+    // arduboy->print("xOffset: ");
+    // arduboy->print(xOffset);
+    // arduboy->println("  ");
+
+
+    // yi = 1;
+    // rendered_width=5;
+    // xi=5;
+    // // if (yi>2)
+    // //   yi=2;
+    // // if (xi>20)
+    // //   xi=20;
+    // // xi=10;
     asm volatile(
       "push r28\n" // save Y
       "push r29\n"
       "mov r28, %A[buffer_page2_ofs]\n" // Y = buffer page 2 offset
       "mov r29, %B[buffer_page2_ofs]\n"
       "loop_y:\n"
-
       "loop_x:\n"
         // load bitmap and mask data
         "lpm %A[bitmap_data], Z+\n"
@@ -277,18 +300,18 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
       // sprite_ofs += w - rendered_width;
       "add %A[sprite_ofs], %[w]\n"
       "adc %B[sprite_ofs], __zero_reg__\n"
-      "sub %A[sprite_ofs], %[y_count]\n"
+      "sub %A[sprite_ofs], %[x_count]\n"
       "sbc %B[sprite_ofs], __zero_reg__\n"
       // buffer_ofs += WIDTH - rendered_width;
       "ldi r16, %[width]\n"
       "add %A[buffer_ofs], r16\n"
       "adc %B[buffer_ofs], __zero_reg__\n"
-      "sub %A[buffer_ofs], %[y_count]\n"
+      "sub %A[buffer_ofs], %[x_count]\n"
       "sbc %B[buffer_ofs], __zero_reg__\n"
       // buffer_ofs_page_2 += WIDTH - rendered_width;
       "add r28, r16\n"
       "adc r29, __zero_reg__\n"
-      "sub r28, %[y_count]\n"
+      "sub r28, %[x_count]\n"
       "sbc r29, __zero_reg__\n"
 
 
@@ -298,20 +321,20 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
       "pop r29\n"
       "pop r28\n"
       "clr __zero_reg__\n" // just in case
+      : [xi] "+&r" (xi),
+        [yi] "+&r" (yi),
+        [sRow] "+&a" (sRow), // CPI requires an upper register
+        [data] "+&r" (data),
+        [mask_data] "+&r" (mask_data),
+        [bitmap_data] "+&r" (bitmap_data)
       :
-      : [data] "r" (data),
-        [xi] "r" (xi),
-        [yi] "r" (yi),
-        [x_count] "r" (loop_h),
-        [y_count] "r" (rendered_width),
-        [mask_data] "r" (mask_data),
-        [bitmap_data] "r" (bitmap_data),
+        [x_count] "r" (rendered_width),
+        [y_count] "r" (loop_h),
         [sprite_ofs] "z" (bofs),
         [buffer_ofs] "x" (sBuffer+ofs),
         [buffer_page2_ofs] "r" (sBuffer+ofs+WIDTH), // Y pointer
         [yOffset] "r" (yOffset),
         [mul_amt] "r" (mul_amt),
-        [sRow] "a" (sRow), // CPI requires an upper register
         [w] "r" (w),
         [width] "M" (WIDTH)
 
