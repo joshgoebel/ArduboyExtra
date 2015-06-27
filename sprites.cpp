@@ -263,32 +263,27 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
             "st Y+, %[data]\n"
 
         "end_second_page:\n"
-
         "skip_shifting:\n"
 
 
-
         // FIRST PAGE
+        "ld %[data], %a[buffer_ofs]\n"
         // if sRow >= 0
         "tst %[sRow]\n"
         "brmi end_first_page\n"
           // then
-          "ld %[data], %a[buffer_ofs]\n"
           "com %A[mask_data]\n"
           "and %[data], %A[mask_data]\n"
           "or %[data], %A[bitmap_data]\n"
-          // update buffer, increment
-          "st %a[buffer_ofs], %[data]\n"
 
-        // increment X counter
         "end_first_page:\n"
-          "adiw r26, 1\n"
+        // update buffer, increment
+        "st %a[buffer_ofs]+, %[data]\n"
 
 
         // "x_loop_next:\n"
         "dec %[xi]\n"
-        "breq next_loop_y\n"
-        "rjmp loop_x\n"
+        "brne loop_x\n"
 
       // increment y
       "next_loop_y:\n"
