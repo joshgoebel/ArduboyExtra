@@ -60,27 +60,52 @@ boolean SimpleButtons::notPressed(uint8_t buttons)
   return (currentButtonState & buttons) == 0;
 }
 
-// returns true if up was just pressed
 boolean SimpleButtons::up() {
-	return justPressed(UP_BUTTON);
+  return pressed(UP_BUTTON);
 }
 
 boolean SimpleButtons::down() {
-	return justPressed(DOWN_BUTTON);
+  return pressed(DOWN_BUTTON);
 }
 
 boolean SimpleButtons::right() {
-	return justPressed(RIGHT_BUTTON);
+  return pressed(RIGHT_BUTTON);
 }
 
 boolean SimpleButtons::left() {
-	return justPressed(LEFT_BUTTON);
+  return pressed(LEFT_BUTTON);
 }
 
 boolean SimpleButtons::a() {
-	return justPressed(A_BUTTON);
+  return pressed(A_BUTTON);
 }
 
 boolean SimpleButtons::b() {
-	return justPressed(B_BUTTON);
+  return pressed(B_BUTTON);
+}
+
+
+
+boolean SimpleButtons::pressedUp() {
+  return justPressed(UP_BUTTON);
+}
+
+boolean SimpleButtons::pressedDown() {
+  return justPressed(DOWN_BUTTON);
+}
+
+boolean SimpleButtons::pressedRight() {
+  return justPressed(RIGHT_BUTTON);
+}
+
+boolean SimpleButtons::pressedLeft() {
+  return justPressed(LEFT_BUTTON);
+}
+
+boolean SimpleButtons::pressedA() {
+  return justPressed(A_BUTTON);
+}
+
+boolean SimpleButtons::pressedB() {
+  return justPressed(B_BUTTON);
 }

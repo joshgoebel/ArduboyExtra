@@ -21,12 +21,21 @@ public:
 	boolean justReleased(uint8_t button);
 	boolean justPressed(uint8_t button);
 
+	// returns true if button is current depressed
 	boolean up();
 	boolean down();
 	boolean right();
 	boolean left();
 	boolean a();
 	boolean b();
+
+	// returns true if button is was just pressed (previously unpressed)
+	boolean pressedUp();
+	boolean pressedDown();
+	boolean pressedRight();
+	boolean pressedLeft();
+	boolean pressedA();
+	boolean pressedB();
 
 
 private:
