@@ -24,38 +24,64 @@ void Sprites::draw(Sprite sprite)
 {
   draw(sprite.x, sprite.y,
     sprite.bitmap, sprite.frame,
-    sprite.mask, sprite.maskFrame);
+    sprite.mask, sprite.maskFrame,
+    sprite.drawMode);
+}
+
+void Sprites::draw(SimpleSprite sprite)
+{
+  draw(sprite.x, sprite.y,
+    sprite.bitmap, sprite.frame,
+    NULL, 0,
+    sprite.drawMode);
 }
 
 void Sprites::draw(int16_t x, int16_t y, const uint8_t *bitmap)
 {
-  draw(x, y, bitmap, 0, NULL, 0);
+  draw(x, y, bitmap, 0, NULL, 0, SPRITE_AUTO_MODE);
 }
 
 void Sprites::draw(int16_t x, int16_t y, const uint8_t *bitmap, const uint8_t *mask)
 {
-  draw(x, y, bitmap, 0, mask, 0);
+  draw(x, y, bitmap, 0, mask, 0, SPRITE_AUTO_MODE);
 }
 
 void Sprites::draw(int16_t x, int16_t y, const uint8_t *bitmap, uint8_t frame)
 {
-  draw(x, y, bitmap, frame, NULL, 0);
+  draw(x, y, bitmap, frame, NULL, 0, SPRITE_AUTO_MODE);
 }
 
-void Sprites::draw(int16_t x, int16_t y, const uint8_t *bitmap, uint8_t frame, const uint8_t *mask, uint8_t sprite_frame)
+void Sprites::draw(int16_t x, int16_t y,
+  const uint8_t *bitmap, uint8_t frame,
+  const uint8_t *mask, uint8_t sprite_frame,
+  uint8_t drawMode
+  )
 {
+  if (bitmap == NULL)
+    return;
+
   uint8_t width = pgm_read_byte(bitmap);
   uint8_t height = pgm_read_byte(++bitmap);
   unsigned int frame_offset;
   bitmap++;
   if (frame > 0 || sprite_frame > 0) {
     frame_offset = (width * ( height/8 + ( height%8 == 0 ? 0 : 1)));
+    // sprite plus mask uses twice as much space for each frame
+    if (drawMode == SPRITE_PLUS_MASK) {
+      frame_offset*2;
+    }
     bitmap += frame * frame_offset;
-    if (mask!=0)
+    if (mask != NULL)
       mask += sprite_frame * frame_offset;
   }
 
-  drawBitmap(x, y, bitmap, mask, width, height, mask==0 ? SPRITE_UNMASKED : SPRITE_MASKED);
+  // if we're detecting the draw mode then base it on whether a mask
+  // was passed as a separate object
+  if (drawMode == SPRITE_AUTO_MODE) {
+    drawMode = mask == NULL ? SPRITE_UNMASKED : SPRITE_MASKED;
+  }
+
+  drawBitmap(x, y, bitmap, mask, width, height, drawMode);
 }
 
 // should we still even support these modes?
@@ -68,6 +94,9 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
   int8_t w, int8_t h, uint8_t draw_mode) {
   // no need to draw at all of we're offscreen
   if (x+w <= 0 || x > WIDTH-1 || y+h <= 0 || y > HEIGHT-1)
+    return;
+
+  if (bitmap == NULL)
     return;
 
   // xOffset technically doesn't need to be 16 bit but the math operations
@@ -197,33 +226,50 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
     break;
 
     case SPRITE_MASKED:
+    for (uint8_t a = 0; a < loop_h; a++) {
+      for (uint8_t iCol = 0; iCol < rendered_width; iCol++) {
+        // NOTE: you might think in the yOffset==0 case that this results
+        // in more effort, but in all my testing the compiler was forcing
+        // 16-bit math to happen here anyways, so this isn't actually
+        // compiling to more code than it otherwise would. If the offset
+        // is 0 the high part of the word will just never be used.
+
+        // load data and bit shift
+        // mask needs to be bit flipped
+        mask_data = ~(pgm_read_byte(mask_ofs) * mul_amt);
+        bitmap_data = pgm_read_byte(bofs) * mul_amt;
+
+        if (sRow >= 0) {
+          data = sBuffer[ofs];
+          data &= (uint8_t)(mask_data);
+          data |= (uint8_t)(bitmap_data);
+          sBuffer[ofs] = data;
+        }
+        if (yOffset != 0 && sRow < 7) {
+          data = sBuffer[ofs+WIDTH];
+          data &= (*((unsigned char *) (&mask_data) + 1));
+          data |= (*((unsigned char *) (&bitmap_data) + 1));
+          sBuffer[ofs+WIDTH] = data;
+        }
+        ofs++;
+        mask_ofs++;
+        bofs++;
+      }
+      sRow++;
+      bofs += w - rendered_width;
+      mask_ofs += w - rendered_width;
+      ofs += WIDTH - rendered_width;
+    }
+    break;
+
+
+    case SPRITE_PLUS_MASK:
+    // *2 because we use double the bits (mask + bitmap)
+    bofs = (uint8_t *)(bitmap + ((start_h*w) + xOffset)*2);
+
     uint8_t xi = rendered_width; // used for x loop below
     uint8_t yi = loop_h; // used for y loop below
 
-    // arduboy->setCursor(0,32);
-    // arduboy->print("xi: ");
-    // arduboy->print(xi);
-    // arduboy->print("   yi: ");
-    // arduboy->print(yi);
-    // arduboy->println("  ");
-    // arduboy->print("x: ");
-    // arduboy->print(x);
-    // arduboy->print("   y: ");
-    // arduboy->print(y);
-    // arduboy->println("  ");
-    // arduboy->print("xOffset: ");
-    // arduboy->print(xOffset);
-    // arduboy->println("  ");
-
-
-    // yi = 1;
-    // rendered_width=5;
-    // xi=5;
-    // // if (yi>2)
-    // //   yi=2;
-    // // if (xi>20)
-    // //   xi=20;
-    // // xi=10;
     asm volatile(
       "push r28\n" // save Y
       "push r29\n"
@@ -233,10 +279,7 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
       "loop_x:\n"
         // load bitmap and mask data
         "lpm %A[bitmap_data], Z+\n"
-
-        // self mask for now
-        // "lpm %A[mask_data], Z+\n"
-        "mov %A[mask_data], %A[bitmap_data]\n"
+        "lpm %A[mask_data], Z+\n"
 
         // shift mask and buffer data
         "tst %[yOffset]\n"
@@ -293,18 +336,15 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
       // sRow++;
       "inc %[sRow]\n"
       "clr __zero_reg__\n"
-      // sprite_ofs += w - rendered_width;
-      "add %A[sprite_ofs], %[w]\n"
+      // sprite_ofs += (w - rendered_width) * 2;
+      "add %A[sprite_ofs], %A[sprite_ofs_jump]\n"
       "adc %B[sprite_ofs], __zero_reg__\n"
-      "sub %A[sprite_ofs], %[x_count]\n"
-      "sbc %B[sprite_ofs], __zero_reg__\n"
       // buffer_ofs += WIDTH - rendered_width;
       "add %A[buffer_ofs], %A[buffer_ofs_jump]\n"
       "adc %B[buffer_ofs], __zero_reg__\n"
       // buffer_ofs_page_2 += WIDTH - rendered_width;
       "add r28, %A[buffer_ofs_jump]\n"
       "adc r29, __zero_reg__\n"
-
 
       "rjmp loop_y\n"
       "finished:\n"
@@ -325,50 +365,13 @@ void Sprites::drawBitmap(int16_t x, int16_t y,
         [buffer_ofs] "x" (sBuffer+ofs),
         [buffer_page2_ofs] "r" (sBuffer+ofs+WIDTH), // Y pointer
         [buffer_ofs_jump] "r" (WIDTH-rendered_width),
+        [sprite_ofs_jump] "r" ((w-rendered_width)*2),
         [yOffset] "r" (yOffset),
-        [mul_amt] "r" (mul_amt),
-        [w] "r" (w)
+        [mul_amt] "r" (mul_amt)
 
-      : "r16"
+      :
     );
-    return;
-
-    for (uint8_t a = 0; a < loop_h; a++) {
-      for (uint8_t iCol = 0; iCol < rendered_width; iCol++) {
-        // NOTE: you might think in the yOffset==0 case that this result
-        // in more effort, but in all my testing the compiler was forcing
-        // 16-bit math to happen here anyways, so this isn't actually
-        // compiling to more code than it otherwise would. If the offset
-        // is 0 the high part of the word will just never be used.
-
-        // load data and bit shift
-        // mask needs to be bit flipped
-        mask_data = ~(pgm_read_byte(mask_ofs) * mul_amt);
-        bitmap_data = pgm_read_byte(bofs) * mul_amt;
-
-        if (sRow >= 0) {
-          data = sBuffer[ofs];
-          data &= (uint8_t)(mask_data);
-          data |= (uint8_t)(bitmap_data);
-          sBuffer[ofs] = data;
-        }
-        if (yOffset != 0 && sRow < 7) {
-          data = sBuffer[ofs+WIDTH];
-          data &= (*((unsigned char *) (&mask_data) + 1));
-          data |= (*((unsigned char *) (&bitmap_data) + 1));
-          sBuffer[ofs+WIDTH] = data;
-        }
-        ofs++;
-        mask_ofs++;
-        bofs++;
-      }
-      sRow++;
-      bofs += w - rendered_width;
-      mask_ofs += w - rendered_width;
-      ofs += WIDTH - rendered_width;
-    }
     break;
-
 
   }
 }
