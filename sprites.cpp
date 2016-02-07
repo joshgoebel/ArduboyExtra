@@ -19,6 +19,37 @@ Sprite::Sprite(int x, int y, const uint8_t *bitmap, const uint8_t *mask) :
   SimpleSprite(x,y, bitmap), mask(mask) {
 }
 
+// new API
+
+void Sprites::drawExternalMask(int16_t x, int16_t y, const uint8_t *bitmap, 
+  const uint8_t *mask, uint8_t frame, uint8_t mask_frame)
+{
+  spriteRC rc;
+  draw(x, y, bitmap, frame, mask, mask_frame, SPRITE_MASKED); 
+}
+
+void Sprites::drawOverwrite(int16_t x, int16_t y, const uint8_t *bitmap, uint8_t frame)
+{
+  draw(x, y, bitmap, frame, NULL, 0, SPRITE_OVERWRITE); 
+} 
+
+void Sprites::drawErase(int16_t x, int16_t y, const uint8_t *bitmap, uint8_t frame)
+{
+  draw(x, y, bitmap, frame, NULL, 0, SPRITE_IS_MASK_ERASE);
+}
+
+void Sprites::drawSelfMasked(int16_t x, int16_t y, const uint8_t *bitmap, uint8_t frame)
+{
+  draw(x, y, bitmap, frame, NULL, 0, SPRITE_IS_MASK);
+}
+
+void Sprites::drawPlusMask(int16_t x, int16_t y, const uint8_t *bitmap, uint8_t frame)
+{
+  draw(x, y, bitmap, frame, NULL, 0, SPRITE_PLUS_MASK);
+}
+
+
+// older api and common functions
 
 void Sprites::draw(Sprite sprite)
 {
@@ -51,11 +82,6 @@ void Sprites::draw(int16_t x, int16_t y, const uint8_t *bitmap, uint8_t frame)
   draw(x, y, bitmap, frame, NULL, 0, SPRITE_AUTO_MODE);
 }
 
-void Sprites::drawPlusMask(int16_t x, int16_t y, const uint8_t *bitmap, uint8_t frame)
-{
-  draw(x, y, bitmap, frame, NULL, 0, SPRITE_PLUS_MASK);
-}
-
 
 void Sprites::draw(int16_t x, int16_t y,
   const uint8_t *bitmap, uint8_t frame,
@@ -64,7 +90,7 @@ void Sprites::draw(int16_t x, int16_t y,
   )
 {
   unsigned int frame_offset;
-  
+
   if (bitmap == NULL)
     return;
 
