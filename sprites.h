@@ -44,8 +44,16 @@ public:
 	void draw(int16_t x, int16_t y, const uint8_t *bitmap);
 	void draw(int16_t x, int16_t y, const uint8_t *bitmap, const uint8_t *mask);
 	void draw(int16_t x, int16_t y, const uint8_t *bitmap, uint8_t frame);
+
+	// this is essential `draw` but using the SPRITE_PLUS_MASK mode
+	void drawPlusMask(int16_t x, int16_t y, const uint8_t *bitmap, uint8_t frame);
+
+	// master function, needs to be abstracted into sep function for 
+	// every render type
 	void draw(int16_t x, int16_t y, const uint8_t *bitmap, uint8_t frame,
 		const uint8_t *mask, uint8_t sprite_frame, uint8_t drawMode);
+	
+
 
 	void drawBitmap(int16_t x, int16_t y,
 	  const uint8_t *bitmap, const uint8_t *mask,
